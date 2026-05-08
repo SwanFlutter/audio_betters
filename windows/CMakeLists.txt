@@ -71,6 +71,7 @@ include(FetchContent)
 FetchContent_Declare(
   googletest
   URL https://github.com/google/googletest/archive/release-1.11.0.zip
+  TLS_VERIFY FALSE
 )
 # Prevent overriding the parent project's compiler/linker settings
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)

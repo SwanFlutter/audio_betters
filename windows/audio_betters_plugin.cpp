@@ -64,10 +64,17 @@ void AudioBettersPlugin::HandleMethodCall(
         std::wstring wurl(url.begin(), url.end());
 
         mciSendString(L"close MyAudio", NULL, 0, NULL);
-        std::wstring openCommand = L"open \"" + wurl + L"\" type mpegvideo alias MyAudio";
+
+        std::wstring type = L"mpegvideo";
+        if (wurl.find(L".wav") != std::wstring::npos) {
+            type = L"waveaudio";
+        }
+
+        std::wstring openCommand = L"open \"" + wurl + L"\" type " + type + L" alias MyAudio";
         mciSendString(openCommand.c_str(), NULL, 0, NULL);
+        mciSendString(L"set MyAudio time format milliseconds", NULL, 0, NULL);
         mciSendString(L"play MyAudio", NULL, 0, NULL);
-        result->Success(flutter::EncodableValue()); // Success must have an argument
+        result->Success(flutter::EncodableValue());
       } else {
         result->Error("ARGUMENT_ERROR", "URL is missing or invalid");
       }
@@ -99,6 +106,44 @@ void AudioBettersPlugin::HandleMethodCall(
             mciSendString(volCommand.c_str(), NULL, 0, NULL);
             result->Success(flutter::EncodableValue());
         }
+    }
+  } else if (method_call.method_name().compare("startRecorder") == 0) {
+    if (arguments) {
+        auto path_it = arguments->find(flutter::EncodableValue("path"));
+        if (path_it != arguments->end() && std::holds_alternative<std::string>(path_it->second)) {
+            std::string path = std::get<std::string>(path_it->second);
+            last_record_path = std::wstring(path.begin(), path.end());
+
+            // Note: maxDuration and format are not fully implemented via MCI in this simple version
+            mciSendString(L"close MyRecorder", NULL, 0, NULL);
+            mciSendString(L"open new type waveaudio alias MyRecorder", NULL, 0, NULL);
+            mciSendString(L"record MyRecorder", NULL, 0, NULL);
+            result->Success(flutter::EncodableValue());
+        }
+    }
+  } else if (method_call.method_name().compare("stopRecorder") == 0) {
+    mciSendString(L"stop MyRecorder", NULL, 0, NULL);
+    std::wstring saveCommand = L"save MyRecorder \"" + last_record_path + L"\"";
+    mciSendString(saveCommand.c_str(), NULL, 0, NULL);
+    mciSendString(L"close MyRecorder", NULL, 0, NULL);
+    result->Success(flutter::EncodableValue());
+  } else if (method_call.method_name().compare("getDuration") == 0) {
+    wchar_t duration[128];
+    mciSendString(L"status MyAudio length", duration, 128, NULL);
+    try {
+        int64_t dur = std::stoll(duration);
+        result->Success(flutter::EncodableValue(dur));
+    } catch (...) {
+        result->Success(flutter::EncodableValue(0));
+    }
+  } else if (method_call.method_name().compare("getCurrentPosition") == 0) {
+    wchar_t position[128];
+    mciSendString(L"status MyAudio position", position, 128, NULL);
+    try {
+        int64_t pos = std::stoll(position);
+        result->Success(flutter::EncodableValue(pos));
+    } catch (...) {
+        result->Success(flutter::EncodableValue(0));
     }
   } else {
     result->NotImplemented();

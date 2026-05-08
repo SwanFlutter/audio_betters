@@ -5,6 +5,7 @@ import 'ios_macos_sample.dart';
 import 'windows_sample.dart';
 import 'linux_sample.dart';
 import 'web_sample.dart';
+import 'recorder_sample.dart';
 
 void main() {
   runApp(const MaterialApp(
@@ -72,6 +73,15 @@ class AudioBettersHome extends StatelessWidget {
             color: Colors.deepOrange,
             page: const WebAudioSample(),
             isCurrent: kIsWeb,
+          ),
+          const Divider(height: 40),
+          _buildPlatformTile(
+            context,
+            title: "Audio Recorder (Multi-Platform)",
+            icon: Icons.mic,
+            color: Colors.deepPurple,
+            page: const AudioRecorderSample(),
+            isCurrent: false,
           ),
         ],
       ),

@@ -16,6 +16,7 @@
 struct _AudioBettersPlugin {
   GObject parent_instance;
   GstElement* playbin;
+  GstElement* recorder;
 };
 
 G_DEFINE_TYPE(AudioBettersPlugin, audio_betters_plugin, g_object_get_type())
@@ -38,7 +39,18 @@ static void audio_betters_plugin_handle_method_call(
     const gchar* url = fl_value_get_string(fl_value_lookup_string(args, "url"));
 
     gst_element_set_state(self->playbin, GST_STATE_READY);
-    g_object_set(self->playbin, "uri", url, NULL);
+
+    if (g_str_has_prefix(url, "http://") || g_str_has_prefix(url, "https://") || g_str_has_prefix(url, "file://")) {
+        g_object_set(self->playbin, "uri", url, NULL);
+    } else {
+        g_autofree gchar* file_uri = g_filename_to_uri(url, nullptr, nullptr);
+        if (file_uri) {
+            g_object_set(self->playbin, "uri", file_uri, NULL);
+        } else {
+            g_object_set(self->playbin, "uri", url, NULL);
+        }
+    }
+
     gst_element_set_state(self->playbin, GST_STATE_PLAYING);
 
     response = FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
@@ -56,6 +68,36 @@ static void audio_betters_plugin_handle_method_call(
     double volume = fl_value_get_float(fl_value_lookup_string(args, "volume"));
     g_object_set(self->playbin, "volume", volume, NULL);
     response = FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
+  } else if (strcmp(method, "startRecorder") == 0) {
+    FlValue* args = fl_method_call_get_args(method_call);
+    const gchar* path = fl_value_get_string(fl_value_lookup_string(args, "path"));
+    const gchar* format = fl_value_get_string(fl_value_lookup_string(args, "format"));
+
+    if (self->recorder) {
+      gst_element_set_state(self->recorder, GST_STATE_NULL);
+      gst_object_unref(self->recorder);
+    }
+
+    gchar* encoder;
+    if (strcmp(format, "wav") == 0) {
+        encoder = "wavenc";
+    } else {
+        encoder = "voaacenc ! mp4mux"; // AAC
+    }
+
+    gchar* pipeline_str = g_strdup_printf("autoaudiosrc ! audioconvert ! %s ! filesink location=%s", encoder, path);
+    self->recorder = gst_parse_launch(pipeline_str, NULL);
+    g_free(pipeline_str);
+
+    gst_element_set_state(self->recorder, GST_STATE_PLAYING);
+    response = FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
+  } else if (strcmp(method, "stopRecorder") == 0) {
+    if (self->recorder) {
+      gst_element_set_state(self->recorder, GST_STATE_NULL);
+      gst_object_unref(self->recorder);
+      self->recorder = nullptr;
+    }
+    response = FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
   } else {
     response = FL_METHOD_RESPONSE(fl_method_not_implemented_response_new());
   }
@@ -69,6 +111,11 @@ static void audio_betters_plugin_dispose(GObject* object) {
     gst_element_set_state(self->playbin, GST_STATE_NULL);
     gst_object_unref(self->playbin);
     self->playbin = nullptr;
+  }
+  if (self->recorder) {
+    gst_element_set_state(self->recorder, GST_STATE_NULL);
+    gst_object_unref(self->recorder);
+    self->recorder = nullptr;
   }
   G_OBJECT_CLASS(audio_betters_plugin_parent_class)->dispose(object);
 }

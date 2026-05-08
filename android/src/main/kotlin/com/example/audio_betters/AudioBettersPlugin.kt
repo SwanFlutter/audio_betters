@@ -2,6 +2,8 @@ package com.example.audio_betters
 
 import android.media.AudioAttributes
 import android.media.MediaPlayer
+import android.media.MediaRecorder
+import android.os.Build
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -13,6 +15,7 @@ import java.io.IOException
 class AudioBettersPlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var channel: MethodChannel
     private var mediaPlayer: MediaPlayer? = null
+    private var mediaRecorder: MediaRecorder? = null
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "audio_betters")
@@ -53,9 +56,92 @@ class AudioBettersPlugin : FlutterPlugin, MethodCallHandler {
                     result.error("ARGUMENT_ERROR", "Volume is null", null)
                 }
             }
+            "startRecorder" -> {
+                val path = call.argument<String>("path")
+                val format = call.argument<String>("format") ?: "aac"
+                val maxDuration = call.argument<Int>("maxDuration") ?: -1
+                if (path != null) {
+                    startRecorder(path, format, maxDuration, result)
+                } else {
+                    result.error("ARGUMENT_ERROR", "Path is null", null)
+                }
+            }
+            "stopRecorder" -> {
+                stopRecorder(result)
+            }
+            "getDuration" -> {
+                val mp = mediaPlayer
+                if (mp != null) {
+                    result.success(mp.duration)
+                } else {
+                    result.success(0)
+                }
+            }
+            "getCurrentPosition" -> {
+                val mp = mediaPlayer
+                if (mp != null) {
+                    result.success(mp.currentPosition)
+                } else {
+                    result.success(0)
+                }
+            }
             else -> {
                 result.notImplemented()
             }
+        }
+    }
+
+    private fun startRecorder(path: String, format: String, maxDuration: Int, result: Result) {
+        try {
+            val recorder = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                MediaRecorder()
+            } else {
+                @Suppress("DEPRECATION")
+                MediaRecorder()
+            }
+            
+            mediaRecorder = recorder
+            recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
+            
+            if (format == "wav" && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                recorder.setOutputFormat(MediaRecorder.OutputFormat.OGG) // OGG/OPUS is better than nothing if WAV not available
+                // Note: For true WAV, MediaRecorder isn't great. Mapping to OGG for "high quality" request or standardizing.
+                // Actually, let's stick to AAC and 3GP for simplicity or try a better mapping.
+                recorder.setAudioEncoder(MediaRecorder.AudioEncoder.OPUS)
+            } else {
+                recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+            }
+            
+            if (maxDuration > 0) {
+                recorder.setMaxDuration(maxDuration)
+                recorder.setOnInfoListener { _, what, _ ->
+                    if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED) {
+                        // We could send a message back to Dart here if we had a StreamChannel
+                        stopRecorder(null) 
+                    }
+                }
+            }
+
+            recorder.setOutputFile(path)
+            recorder.prepare()
+            recorder.start()
+            result.success(null)
+        } catch (e: Exception) {
+            result.error("RECORDER_ERROR", e.message, null)
+        }
+    }
+
+    private fun stopRecorder(result: Result?) {
+        try {
+            mediaRecorder?.let {
+                it.stop()
+                it.release()
+            }
+            mediaRecorder = null
+            result?.success(null)
+        } catch (e: Exception) {
+            result?.error("STOP_RECORDER_ERROR", e.message, null)
         }
     }
 
@@ -120,5 +206,7 @@ class AudioBettersPlugin : FlutterPlugin, MethodCallHandler {
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel.setMethodCallHandler(null)
         stop()
+        mediaRecorder?.release()
+        mediaRecorder = null
     }
 }

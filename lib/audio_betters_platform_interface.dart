@@ -2,6 +2,11 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'audio_betters_method_channel.dart';
 
+enum AudioFormat {
+  aac,
+  wav,
+}
+
 abstract class AudioBettersPlatform extends PlatformInterface {
   /// Constructs a AudioBettersPlatform.
   AudioBettersPlatform() : super(token: _token);
@@ -45,5 +50,21 @@ abstract class AudioBettersPlatform extends PlatformInterface {
 
   Future<void> setVolume(double volume) {
     throw UnimplementedError('setVolume() has not been implemented.');
+  }
+
+  Future<void> startRecorder(String path, {AudioFormat format = AudioFormat.aac, int? maxDuration}) {
+    throw UnimplementedError('startRecorder() has not been implemented.');
+  }
+
+  Future<void> stopRecorder() {
+    throw UnimplementedError('stopRecorder() has not been implemented.');
+  }
+
+  Future<int> getDuration() {
+    throw UnimplementedError('getDuration() has not been implemented.');
+  }
+
+  Future<int> getCurrentPosition() {
+    throw UnimplementedError('getCurrentPosition() has not been implemented.');
   }
 }
