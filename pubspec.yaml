@@ -1,6 +1,9 @@
 name: audio_betters
 description: "Cross-platform audio playback, recording, and voice-activated conversation mode (hands-free, ChatGPT-style voice capture) for Android, iOS, macOS, Windows, Linux, and Web."
 version: 1.0.0
+repository: https://github.com/SwanFlutter/audio_betters
+homepage: https://github.com/SwanFlutter/audio_betters
+issue_tracker: https://github.com/SwanFlutter/audio_betters/issues
 
 environment:
   sdk: ^3.12.0

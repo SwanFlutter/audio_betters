@@ -1,8 +1,22 @@
+
+
 # audio_betters
+
+[![audio_betters](https://img.shields.io/pub/v/audio_betters.svg)](https://pub.dev/packages/audio_betters)
+[![pub points](https://img.shields.io/pub/points/audio_betters?color=2E8B57&label=pub%20points)](https://pub.dev/packages/audio_betters/score)
+[![likes](https://img.shields.io/pub/likes/audio_betters)](https://pub.dev/packages/audio_betters/score)
+[![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20Web-blue.svg)](https://github.com/SwanFlutter/audio_betters)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Flutter](https://img.shields.io/badge/Flutter-3.44%2B-02569B.svg?logo=flutter)](https://flutter.dev)
+[![GitHub issues](https://img.shields.io/github/issues/SwanFlutter/audio_betters)](https://github.com/SwanFlutter/audio_betters/issues)
+[![GitHub forks](https://img.shields.io/github/forks/SwanFlutter/audio_betters)](https://github.com/SwanFlutter/audio_betters/network/members)
 
 A Flutter plugin for **audio playback, recording, and hands-free voice conversation** across all major platforms — Android, iOS, macOS, Windows, Linux, and Web — using each platform's native audio engine.
 
 New in 1.0.0: **Conversation Mode** — a ChatGPT-voice-style, voice-activated capture loop. One button tap opens the microphone; every utterance is detected automatically and finalized into its own audio file, ready to send to your AI backend.
+
+<img width="549" height="1280" alt="photo_2026-11-14_03-03-08" src="https://github.com/user-attachments/assets/8140e481-2f27-4234-ab52-6a2336f7c1be" />
+
 
 ---
 
@@ -542,3 +556,4 @@ list, and playback — plus per-platform player/recorder samples.
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.
+
