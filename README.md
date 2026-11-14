@@ -4,6 +4,9 @@ A Flutter plugin for **audio playback, recording, and hands-free voice conversat
 
 New in 1.0.0: **Conversation Mode** — a ChatGPT-voice-style, voice-activated capture loop. One button tap opens the microphone; every utterance is detected automatically and finalized into its own audio file, ready to send to your AI backend.
 
+<img width="549" height="1280" alt="photo_2026-11-14_03-03-08" src="https://github.com/user-attachments/assets/8140e481-2f27-4234-ab52-6a2336f7c1be" />
+
+
 ---
 
 ## Platform Support
