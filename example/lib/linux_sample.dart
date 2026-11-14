@@ -29,14 +29,16 @@ class LinuxAudioSample extends StatelessWidget {
               children: [
                 ActionChip(
                   label: const Text("Play Sample"),
-                  onPressed: () => audioPlugin.play("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"),
+                  onPressed: () => audioPlugin.play(
+                    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
+                  ),
                 ),
                 ActionChip(
                   label: const Text("Stop"),
                   onPressed: () => audioPlugin.stop(),
                 ),
               ],
-            )
+            ),
           ],
         ),
       ),

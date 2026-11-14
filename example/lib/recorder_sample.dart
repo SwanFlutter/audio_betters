@@ -1,10 +1,11 @@
 import 'dart:async';
-import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:audio_betters/audio_betters.dart';
-import 'package:audio_betters/audio_betters_platform_interface.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+
+import 'io/paths.dart';
 
 class AudioRecorderSample extends StatefulWidget {
   const AudioRecorderSample({super.key});
@@ -18,38 +19,60 @@ class _AudioRecorderSampleState extends State<AudioRecorderSample> {
   bool _isRecording = false;
   String? _recordedPath;
   bool _isPlaying = false;
-  
+
   Duration _duration = Duration.zero;
   Duration _position = Duration.zero;
   Timer? _playbackTimer;
-  
+
   AudioFormat _selectedFormat = AudioFormat.aac;
   int _maxDurationSeconds = 10;
   int _elapsedSeconds = 0;
   Timer? _timer;
 
   Future<void> _startRecording() async {
-    final status = await Permission.microphone.request();
-    if (status != PermissionStatus.granted) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("اجازه دسترسی به میکروفون داده نشده است")),
-        );
+    // On Web the browser itself prompts for microphone access.
+    if (!kIsWeb) {
+      final status = await Permission.microphone.request();
+      if (status != PermissionStatus.granted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("اجازه دسترسی به میکروفون داده نشده است"),
+            ),
+          );
+        }
+        return;
       }
-      return;
     }
 
     try {
-      final tempDir = await getTemporaryDirectory();
-      String extension = _selectedFormat == AudioFormat.wav ? "wav" : "m4a";
-      final path = "${tempDir.path}/test_record_${DateTime.now().millisecondsSinceEpoch}.$extension";
-      
+      // Browsers cannot write to a file path — Web ignores this name and
+      // returns a blob: URL from stopRecorder() instead.
+      final tempDir = canUseFileSystem ? await tempDirPath() : '';
+      final isWindows =
+          !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+      // Windows MCI recorder specifically produces WAV content
+      String extension = (isWindows || _selectedFormat == AudioFormat.wav)
+          ? "wav"
+          : "m4a";
+
+      // Use join to handle platform-specific separators
+      final sep =
+          tempDir.isEmpty || tempDir.endsWith('/') || tempDir.endsWith(r'\')
+          ? ''
+          : (isWindows ? r'\' : '/');
+      String path =
+          "$tempDir$sep"
+          "voice_${DateTime.now().millisecondsSinceEpoch}.$extension";
+
+      debugPrint("DEBUG: Target Recording Path: $path");
+
       await _audioPlugin.startRecorder(
-        path, 
+        path,
         format: _selectedFormat,
         maxDuration: _maxDurationSeconds * 1000,
       );
-      
+
       setState(() {
         _isRecording = true;
         _recordedPath = path;
@@ -72,9 +95,12 @@ class _AudioRecorderSampleState extends State<AudioRecorderSample> {
   Future<void> _stopRecording() async {
     _timer?.cancel();
     try {
-      await _audioPlugin.stopRecorder();
+      // The platform reports the final path — a real file on native
+      // platforms, a blob: URL on Web.
+      final finalPath = await _audioPlugin.stopRecorder();
       setState(() {
         _isRecording = false;
+        if (finalPath != null) _recordedPath = finalPath;
       });
     } catch (e) {
       debugPrint("Error stopping recorder: $e");
@@ -91,15 +117,14 @@ class _AudioRecorderSampleState extends State<AudioRecorderSample> {
       debugPrint("DEBUG: Currently recording, cannot play");
       return;
     }
-    
+
     try {
       debugPrint("DEBUG: Stopping any current playback...");
       await _audioPlugin.stop();
-      
-      final file = File(_recordedPath!);
-      bool exists = await file.exists();
+
+      bool exists = await fileExists(_recordedPath!);
       debugPrint("DEBUG: Checking file existence: $exists");
-      
+
       if (!exists) {
         debugPrint("DEBUG: File DOES NOT exist at path: $_recordedPath");
         if (mounted) {
@@ -109,8 +134,8 @@ class _AudioRecorderSampleState extends State<AudioRecorderSample> {
         }
         return;
       }
-      
-      int length = await file.length();
+
+      int length = await fileSizeBytes(_recordedPath!);
       debugPrint("DEBUG: File size: $length bytes");
       if (length == 0) {
         debugPrint("DEBUG: File is empty (0 bytes)!");
@@ -119,7 +144,7 @@ class _AudioRecorderSampleState extends State<AudioRecorderSample> {
       debugPrint("DEBUG: Calling _audioPlugin.play with path: $_recordedPath");
       await _audioPlugin.play(_recordedPath!);
       debugPrint("DEBUG: _audioPlugin.play call finished successfully");
-      
+
       // Get duration and start progress timer
       final durMs = await _audioPlugin.getDuration();
       setState(() {
@@ -127,9 +152,8 @@ class _AudioRecorderSampleState extends State<AudioRecorderSample> {
         _duration = Duration(milliseconds: durMs);
         _position = Duration.zero;
       });
-      
+
       _startPlaybackTimer();
-      
     } catch (e, stack) {
       debugPrint("DEBUG: ERROR during playing: $e");
       debugPrint("DEBUG: StackTrace: $stack");
@@ -138,19 +162,22 @@ class _AudioRecorderSampleState extends State<AudioRecorderSample> {
 
   void _startPlaybackTimer() {
     _playbackTimer?.cancel();
-    _playbackTimer = Timer.periodic(const Duration(milliseconds: 200), (timer) async {
+    _playbackTimer = Timer.periodic(const Duration(milliseconds: 200), (
+      timer,
+    ) async {
       if (!_isPlaying) {
         timer.cancel();
         return;
       }
-      
+
       final posMs = await _audioPlugin.getCurrentPosition();
       setState(() {
         _position = Duration(milliseconds: posMs);
       });
-      
+
       // If reached end
-      if (_duration.inMilliseconds > 0 && _position.inMilliseconds >= _duration.inMilliseconds - 100) {
+      if (_duration.inMilliseconds > 0 &&
+          _position.inMilliseconds >= _duration.inMilliseconds - 100) {
         _stopPlayback();
       }
     });
@@ -196,7 +223,9 @@ class _AudioRecorderSampleState extends State<AudioRecorderSample> {
                     height: 150,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: _isRecording ? Colors.red.withOpacity(0.1) : Colors.grey[200],
+                      color: _isRecording
+                          ? Colors.red.withValues(alpha: 0.1)
+                          : Colors.grey[200],
                     ),
                   ),
                   Icon(
@@ -218,27 +247,38 @@ class _AudioRecorderSampleState extends State<AudioRecorderSample> {
               ),
               const SizedBox(height: 20),
               Text(
-                _isRecording ? "00:${_elapsedSeconds.toString().padLeft(2, '0')}" : "آماده ضبط",
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                _isRecording
+                    ? "00:${_elapsedSeconds.toString().padLeft(2, '0')}"
+                    : "آماده ضبط",
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 40),
-              
+
               // Settings Card
               if (!_isRecording)
                 Card(
                   elevation: 2,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
                       children: [
-                        const Text("تنظیمات ضبط", style: TextStyle(fontWeight: FontWeight.bold)),
+                        const Text(
+                          "تنظیمات ضبط",
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
                         const Divider(),
                         DropdownButtonListTile(
                           title: "فرمت فایل:",
                           value: _selectedFormat,
                           items: AudioFormat.values,
-                          onChanged: (val) => setState(() => _selectedFormat = val!),
+                          onChanged: (val) =>
+                              setState(() => _selectedFormat = val!),
                         ),
                         const SizedBox(height: 10),
                         Row(
@@ -251,7 +291,9 @@ class _AudioRecorderSampleState extends State<AudioRecorderSample> {
                                 max: 60,
                                 divisions: 11,
                                 label: _maxDurationSeconds.toString(),
-                                onChanged: (val) => setState(() => _maxDurationSeconds = val.toInt()),
+                                onChanged: (val) => setState(
+                                  () => _maxDurationSeconds = val.toInt(),
+                                ),
                               ),
                             ),
                             Text("$_maxDurationSeconds"),
@@ -261,45 +303,60 @@ class _AudioRecorderSampleState extends State<AudioRecorderSample> {
                     ),
                   ),
                 ),
-                
+
               const SizedBox(height: 40),
-              
+
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   ElevatedButton.icon(
                     onPressed: _isRecording ? _stopRecording : _startRecording,
-                    icon: Icon(_isRecording ? Icons.stop : Icons.fiber_manual_record),
+                    icon: Icon(
+                      _isRecording ? Icons.stop : Icons.fiber_manual_record,
+                    ),
                     label: Text(_isRecording ? "توقف ضبط" : "شروع ضبط"),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _isRecording ? Colors.black : Colors.red,
                       foregroundColor: Colors.white,
                       minimumSize: const Size(150, 50),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
                     ),
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 40),
               if (_recordedPath != null && !_isRecording) ...[
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
+                    color: Colors.green.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(15),
-                    border: Border.all(color: Colors.green.withOpacity(0.3)),
+                    border: Border.all(
+                      color: Colors.green.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Column(
                     children: [
-                      const Text("فایل آماده پخش است", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                      const Text(
+                        "فایل آماده پخش است",
+                        style: TextStyle(
+                          color: Colors.green,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       const SizedBox(height: 10),
                       Text(
-                        _recordedPath!.split('/').last,
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        _recordedPath!.split(RegExp(r'[/\\]')).last,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
                       ),
                       const SizedBox(height: 20),
-                      
+
                       // Progress Bar
                       if (_duration.inMilliseconds > 0)
                         Column(
@@ -308,46 +365,71 @@ class _AudioRecorderSampleState extends State<AudioRecorderSample> {
                               value: _position.inMilliseconds.toDouble(),
                               max: _duration.inMilliseconds.toDouble(),
                               onChanged: (value) {
-                                // Seeking is not implemented yet in the plugin
+                                // Preview the thumb position while dragging.
+                                setState(
+                                  () => _position = Duration(
+                                    milliseconds: value.toInt(),
+                                  ),
+                                );
+                              },
+                              onChangeEnd: (value) {
+                                _audioPlugin.seekTo(value.toInt());
                               },
                               activeColor: Colors.green,
                             ),
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text(_formatDuration(_position), style: const TextStyle(fontSize: 10)),
-                                  Text(_formatDuration(_duration), style: const TextStyle(fontSize: 10)),
+                                  Text(
+                                    _formatDuration(_position),
+                                    style: const TextStyle(fontSize: 10),
+                                  ),
+                                  Text(
+                                    _formatDuration(_duration),
+                                    style: const TextStyle(fontSize: 10),
+                                  ),
                                 ],
                               ),
                             ),
                           ],
                         ),
-                      
+
                       const SizedBox(height: 10),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           IconButton.filled(
-                            onPressed: _isPlaying ? _stopPlayback : _playRecording,
-                            icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
+                            onPressed: _isPlaying
+                                ? _stopPlayback
+                                : _playRecording,
+                            icon: Icon(
+                              _isPlaying ? Icons.pause : Icons.play_arrow,
+                            ),
                             style: IconButton.styleFrom(
-                              backgroundColor: _isPlaying ? Colors.blue : Colors.green
+                              backgroundColor: _isPlaying
+                                  ? Colors.blue
+                                  : Colors.green,
                             ),
                           ),
                           const SizedBox(width: 20),
                           IconButton.filled(
                             onPressed: _stopPlayback,
                             icon: const Icon(Icons.stop),
-                            style: IconButton.styleFrom(backgroundColor: Colors.orange),
+                            style: IconButton.styleFrom(
+                              backgroundColor: Colors.orange,
+                            ),
                           ),
                         ],
                       ),
                     ],
                   ),
                 ),
-              ]
+              ],
             ],
           ),
         ),
@@ -385,10 +467,14 @@ class DropdownButtonListTile<T> extends StatelessWidget {
         Text(title),
         DropdownButton<T>(
           value: value,
-          items: items.map((e) => DropdownMenuItem(
-            value: e,
-            child: Text(e.toString().split('.').last.toUpperCase()),
-          )).toList(),
+          items: items
+              .map(
+                (e) => DropdownMenuItem(
+                  value: e,
+                  child: Text(e.toString().split('.').last.toUpperCase()),
+                ),
+              )
+              .toList(),
           onChanged: onChanged,
         ),
       ],

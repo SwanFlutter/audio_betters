@@ -7,10 +7,13 @@ void main() {
 
   MethodChannelAudioBetters platform = MethodChannelAudioBetters();
   const MethodChannel channel = MethodChannel('audio_betters');
+  late List<MethodCall> calls;
 
   setUp(() {
+    calls = [];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+          calls.add(methodCall);
           return '42';
         });
   });
@@ -22,5 +25,11 @@ void main() {
 
   test('getPlatformVersion', () async {
     expect(await platform.getPlatformVersion(), '42');
+  });
+
+  test('seekTo passes milliseconds through', () async {
+    await platform.seekTo(1234);
+    expect(calls.single.method, 'seekTo');
+    expect(calls.single.arguments, {'position': 1234});
   });
 }

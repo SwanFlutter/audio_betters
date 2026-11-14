@@ -23,7 +23,6 @@ allprojects {
 
 plugins {
     id("com.android.library")
-    id("kotlin-android")
 }
 
 android {
@@ -34,10 +33,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
     sourceSets {
@@ -67,6 +62,15 @@ android {
                 }
             }
         }
+    }
+}
+
+// Built-in Kotlin migration (Flutter >= 3.44): the plugin no longer applies
+// the Kotlin Gradle Plugin itself; the compiler is provided by Flutter/AGP 9.
+// https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-plugin-authors
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
 }
 

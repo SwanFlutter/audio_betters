@@ -10,12 +10,15 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import java.io.IOException
+import kotlin.math.log10
 
 /** AudioBettersPlugin */
 class AudioBettersPlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var channel: MethodChannel
     private var mediaPlayer: MediaPlayer? = null
     private var mediaRecorder: MediaRecorder? = null
+    private var pendingPlayResult: Result? = null
+    private var recordingPath: String? = null
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "audio_betters")
@@ -47,6 +50,11 @@ class AudioBettersPlugin : FlutterPlugin, MethodCallHandler {
                 stop()
                 result.success(null)
             }
+            "seekTo" -> {
+                val position = call.argument<Int>("position") ?: 0
+                seekTo(position)
+                result.success(null)
+            }
             "setVolume" -> {
                 val volume = call.argument<Double>("volume")?.toFloat()
                 if (volume != null) {
@@ -69,19 +77,44 @@ class AudioBettersPlugin : FlutterPlugin, MethodCallHandler {
             "stopRecorder" -> {
                 stopRecorder(result)
             }
+            "getRecorderAmplitude" -> {
+                val rec = mediaRecorder
+                if (rec == null) {
+                    result.success(-1.0)
+                } else {
+                    try {
+                        // getMaxAmplitude returns 0..32767 since the last call.
+                        val amp = rec.maxAmplitude.toDouble()
+                        val db = if (amp > 0) 20.0 * log10(amp / 32767.0) else -100.0
+                        // Map -50 dBFS floor -> 0.0 and full scale -> 1.0.
+                        val level = ((db + 50.0) / 50.0).coerceIn(0.0, 1.0)
+                        result.success(level)
+                    } catch (e: Exception) {
+                        result.success(-1.0)
+                    }
+                }
+            }
             "getDuration" -> {
                 val mp = mediaPlayer
-                if (mp != null) {
-                    result.success(mp.duration)
-                } else {
+                try {
+                    if (mp != null) {
+                        result.success(mp.duration)
+                    } else {
+                        result.success(0)
+                    }
+                } catch (e: Exception) {
                     result.success(0)
                 }
             }
             "getCurrentPosition" -> {
                 val mp = mediaPlayer
-                if (mp != null) {
-                    result.success(mp.currentPosition)
-                } else {
+                try {
+                    if (mp != null) {
+                        result.success(mp.currentPosition)
+                    } else {
+                        result.success(0)
+                    }
+                } catch (e: Exception) {
                     result.success(0)
                 }
             }
@@ -99,26 +132,23 @@ class AudioBettersPlugin : FlutterPlugin, MethodCallHandler {
                 @Suppress("DEPRECATION")
                 MediaRecorder()
             }
-            
+
             mediaRecorder = recorder
             recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
-            
+
             if (format == "wav" && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                recorder.setOutputFormat(MediaRecorder.OutputFormat.OGG) // OGG/OPUS is better than nothing if WAV not available
-                // Note: For true WAV, MediaRecorder isn't great. Mapping to OGG for "high quality" request or standardizing.
-                // Actually, let's stick to AAC and 3GP for simplicity or try a better mapping.
+                recorder.setOutputFormat(MediaRecorder.OutputFormat.OGG)
                 recorder.setAudioEncoder(MediaRecorder.AudioEncoder.OPUS)
             } else {
                 recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
                 recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
             }
-            
+
             if (maxDuration > 0) {
                 recorder.setMaxDuration(maxDuration)
                 recorder.setOnInfoListener { _, what, _ ->
                     if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED) {
-                        // We could send a message back to Dart here if we had a StreamChannel
-                        stopRecorder(null) 
+                        stopRecorder(null)
                     }
                 }
             }
@@ -126,28 +156,43 @@ class AudioBettersPlugin : FlutterPlugin, MethodCallHandler {
             recorder.setOutputFile(path)
             recorder.prepare()
             recorder.start()
+            recordingPath = path
             result.success(null)
         } catch (e: Exception) {
+            mediaRecorder?.release()
+            mediaRecorder = null
+            recordingPath = null
             result.error("RECORDER_ERROR", e.message, null)
         }
     }
 
     private fun stopRecorder(result: Result?) {
+        val path = recordingPath
         try {
             mediaRecorder?.let {
                 it.stop()
                 it.release()
             }
             mediaRecorder = null
-            result?.success(null)
+            recordingPath = null
+            result?.success(path)
         } catch (e: Exception) {
+            mediaRecorder?.release()
+            mediaRecorder = null
+            recordingPath = null
             result?.error("STOP_RECORDER_ERROR", e.message, null)
         }
     }
 
     private fun play(url: String, result: Result) {
+        // Resolve a previous still-pending play() with success: being superseded
+        // by a new play request is a normal lifecycle event, not an error
+        // (and matches every other platform's behavior).
+        completePendingPlay()
+        pendingPlayResult = result
+
         try {
-            stop()
+            stopPlayback()
             val mp = MediaPlayer()
             mediaPlayer = mp
             mp.setAudioAttributes(
@@ -159,17 +204,29 @@ class AudioBettersPlugin : FlutterPlugin, MethodCallHandler {
             mp.setDataSource(url)
             mp.prepareAsync()
             mp.setOnPreparedListener { player: MediaPlayer ->
-                player.start()
-                result.success(null)
+                if (pendingPlayResult == result) {
+                    player.start()
+                    result.success(null)
+                    pendingPlayResult = null
+                }
             }
             mp.setOnErrorListener { _: MediaPlayer, what: Int, extra: Int ->
-                result.error("MEDIA_ERROR", "MediaPlayer error: $what, $extra", null)
+                if (pendingPlayResult == result) {
+                    result.error("MEDIA_ERROR", "MediaPlayer error: $what, $extra", null)
+                    pendingPlayResult = null
+                }
                 true
             }
         } catch (e: IOException) {
-            result.error("IO_ERROR", e.message, null)
+            if (pendingPlayResult == result) {
+                result.error("IO_ERROR", e.message, null)
+                pendingPlayResult = null
+            }
         } catch (e: Exception) {
-            result.error("PLAY_ERROR", e.message, null)
+            if (pendingPlayResult == result) {
+                result.error("PLAY_ERROR", e.message, null)
+                pendingPlayResult = null
+            }
         }
     }
 
@@ -190,13 +247,35 @@ class AudioBettersPlugin : FlutterPlugin, MethodCallHandler {
     }
 
     private fun stop() {
+        // Resolve any play() that is still preparing; otherwise its Dart-side
+        // Future would hang forever after we release the MediaPlayer.
+        completePendingPlay()
+        stopPlayback()
+    }
+
+    /** Completes the pending play() call (if any) with success. */
+    private fun completePendingPlay() {
+        val pending = pendingPlayResult ?: return
+        pendingPlayResult = null
+        pending.success(null)
+    }
+
+    /** Releases the player without touching the pending play() result. */
+    private fun stopPlayback() {
         mediaPlayer?.let {
-            if (it.isPlaying) {
-                it.stop()
-            }
+            try {
+                if (it.isPlaying) {
+                    it.stop()
+                }
+            } catch (e: Exception) {}
             it.release()
         }
         mediaPlayer = null
+    }
+
+    /** Jumps to [position] ms; MediaPlayer keeps its play/pause state. */
+    private fun seekTo(position: Int) {
+        mediaPlayer?.seekTo(position)
     }
 
     private fun setVolume(volume: Float) {
@@ -208,5 +287,7 @@ class AudioBettersPlugin : FlutterPlugin, MethodCallHandler {
         stop()
         mediaRecorder?.release()
         mediaRecorder = null
+        recordingPath = null
+        pendingPlayResult = null
     }
 }

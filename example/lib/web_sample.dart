@@ -29,7 +29,9 @@ class _WebAudioSampleState extends State<WebAudioSample> {
             ),
             const SizedBox(height: 40),
             ElevatedButton(
-              onPressed: () => _audioPlugin.play("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3"),
+              onPressed: () => _audioPlugin.play(
+                "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
+              ),
               child: const Text("Play Sound via HTML5 Audio"),
             ),
           ],

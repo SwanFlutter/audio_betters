@@ -40,16 +40,27 @@ class MockAudioBettersPlatform
     throw UnimplementedError();
   }
 
-
+  @override
+  Future<void> seekTo(int milliseconds) {
+    // TODO: implement seekTo
+    throw UnimplementedError();
+  }
 
   @override
-  Future<void> stopRecorder() {
+  Future<String?> stopRecorder() {
     // TODO: implement stopRecorder
     throw UnimplementedError();
   }
 
   @override
-  Future<void> startRecorder(String path, {AudioFormat format = AudioFormat.aac, int? maxDuration}) {
+  Future<double> getRecorderAmplitude() => Future.value(-1.0);
+
+  @override
+  Future<void> startRecorder(
+    String path, {
+    AudioFormat format = AudioFormat.aac,
+    int? maxDuration,
+  }) {
     // TODO: implement startRecorder
     throw UnimplementedError();
   }

@@ -10,7 +10,8 @@ class IosMacosAudioSample extends StatefulWidget {
 
 class _IosMacosAudioSampleState extends State<IosMacosAudioSample> {
   final _audioPlugin = AudioBetters();
-  final String _url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3";
+  final String _url =
+      "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3";
   double _volume = 0.8;
 
   @override
@@ -33,9 +34,18 @@ class _IosMacosAudioSampleState extends State<IosMacosAudioSample> {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                IconButton(onPressed: () => _audioPlugin.pause(), icon: const Icon(Icons.pause)),
-                IconButton(onPressed: () => _audioPlugin.resume(), icon: const Icon(Icons.play_circle)),
-                IconButton(onPressed: () => _audioPlugin.stop(), icon: const Icon(Icons.stop)),
+                IconButton(
+                  onPressed: () => _audioPlugin.pause(),
+                  icon: const Icon(Icons.pause),
+                ),
+                IconButton(
+                  onPressed: () => _audioPlugin.resume(),
+                  icon: const Icon(Icons.play_circle),
+                ),
+                IconButton(
+                  onPressed: () => _audioPlugin.stop(),
+                  icon: const Icon(Icons.stop),
+                ),
               ],
             ),
             const SizedBox(height: 20),
@@ -46,7 +56,7 @@ class _IosMacosAudioSampleState extends State<IosMacosAudioSample> {
                 setState(() => _volume = v);
                 _audioPlugin.setVolume(v);
               },
-            )
+            ),
           ],
         ),
       ),

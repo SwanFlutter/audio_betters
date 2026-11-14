@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'audio_betters_platform_interface.dart';
+import 'src/audio_format.dart';
 
 /// An implementation of [AudioBettersPlatform] that uses method channels.
 class MethodChannelAudioBetters extends AudioBettersPlatform {
@@ -11,7 +12,9 @@ class MethodChannelAudioBetters extends AudioBettersPlatform {
 
   @override
   Future<String?> getPlatformVersion() async {
-    final version = await methodChannel.invokeMethod<String>('getPlatformVersion');
+    final version = await methodChannel.invokeMethod<String>(
+      'getPlatformVersion',
+    );
     return version;
   }
 
@@ -36,12 +39,21 @@ class MethodChannelAudioBetters extends AudioBettersPlatform {
   }
 
   @override
+  Future<void> seekTo(int milliseconds) async {
+    await methodChannel.invokeMethod('seekTo', {'position': milliseconds});
+  }
+
+  @override
   Future<void> setVolume(double volume) async {
     await methodChannel.invokeMethod('setVolume', {'volume': volume});
   }
 
   @override
-  Future<void> startRecorder(String path, {AudioFormat format = AudioFormat.aac, int? maxDuration}) async {
+  Future<void> startRecorder(
+    String path, {
+    AudioFormat format = AudioFormat.aac,
+    int? maxDuration,
+  }) async {
     await methodChannel.invokeMethod('startRecorder', {
       'path': path,
       'format': format.name,
@@ -50,8 +62,17 @@ class MethodChannelAudioBetters extends AudioBettersPlatform {
   }
 
   @override
-  Future<void> stopRecorder() async {
-    await methodChannel.invokeMethod('stopRecorder');
+  Future<String?> stopRecorder() async {
+    final path = await methodChannel.invokeMethod<String>('stopRecorder');
+    return path;
+  }
+
+  @override
+  Future<double> getRecorderAmplitude() async {
+    final level = await methodChannel.invokeMethod<double>(
+      'getRecorderAmplitude',
+    );
+    return level ?? -1.0;
   }
 
   @override
@@ -62,7 +83,9 @@ class MethodChannelAudioBetters extends AudioBettersPlatform {
 
   @override
   Future<int> getCurrentPosition() async {
-    final position = await methodChannel.invokeMethod<int>('getCurrentPosition');
+    final position = await methodChannel.invokeMethod<int>(
+      'getCurrentPosition',
+    );
     return position ?? 0;
   }
 }

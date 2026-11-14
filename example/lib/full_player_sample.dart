@@ -1,9 +1,11 @@
 import 'dart:async';
-import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:audio_betters/audio_betters.dart';
-import 'package:path_provider/path_provider.dart';
+
+import 'io/paths.dart';
 
 class FullPlayerSample extends StatefulWidget {
   const FullPlayerSample({super.key});
@@ -14,14 +16,14 @@ class FullPlayerSample extends StatefulWidget {
 
 class _FullPlayerSampleState extends State<FullPlayerSample> {
   final _audioPlugin = AudioBetters();
-  
+
   bool _isPlaying = false;
   bool _isPaused = false;
-  
+
   Duration _duration = Duration.zero;
   Duration _position = Duration.zero;
   double _volume = 1.0;
-  
+
   Timer? _timer;
   String? _currentFilePath;
   String _status = "آماده پخش";
@@ -33,15 +35,27 @@ class _FullPlayerSampleState extends State<FullPlayerSample> {
   }
 
   Future<void> _initAsset() async {
+    const assetPath =
+        "assets/Are_you_worried_about_your_organization_or_company.mp3";
     try {
-      final byteData = await rootBundle.load("assets/Are_you_worried_about_your_organization_or_company.mp3");
-      final tempDir = await getTemporaryDirectory();
-      final file = File("${tempDir.path}/test_asset.mp3");
-      await file.writeAsBytes(byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes));
+      String path;
+      if (kIsWeb) {
+        // The browser serves Flutter assets directly at their asset URL.
+        path = assetPath;
+      } else {
+        final byteData = await rootBundle.load(assetPath);
+        path = await writeTempFile(
+          "test_asset.mp3",
+          byteData.buffer.asUint8List(
+            byteData.offsetInBytes,
+            byteData.lengthInBytes,
+          ),
+        );
+      }
       setState(() {
-        _currentFilePath = file.path;
+        _currentFilePath = path;
       });
-      debugPrint("Asset loaded to: ${file.path}");
+      debugPrint("Asset loaded to: $path");
     } catch (e) {
       setState(() => _status = "خطا در بارگذاری فایل");
     }
@@ -52,14 +66,14 @@ class _FullPlayerSampleState extends State<FullPlayerSample> {
     try {
       await _audioPlugin.play(_currentFilePath!);
       final durMs = await _audioPlugin.getDuration();
-      
+
       setState(() {
         _isPlaying = true;
         _isPaused = false;
         _duration = Duration(milliseconds: durMs);
         _status = "در حال پخش";
       });
-      
+
       _startTimer();
     } catch (e) {
       setState(() => _status = "خطا در پخش: $e");
@@ -102,14 +116,15 @@ class _FullPlayerSampleState extends State<FullPlayerSample> {
         timer.cancel();
         return;
       }
-      
+
       final posMs = await _audioPlugin.getCurrentPosition();
       setState(() {
         _position = Duration(milliseconds: posMs);
       });
 
       // Auto stop when finished
-      if (_duration.inMilliseconds > 0 && _position.inMilliseconds >= _duration.inMilliseconds - 200) {
+      if (_duration.inMilliseconds > 0 &&
+          _position.inMilliseconds >= _duration.inMilliseconds - 200) {
         _handleStop();
       }
     });
@@ -124,25 +139,44 @@ class _FullPlayerSampleState extends State<FullPlayerSample> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("تست کامل پخش‌کننده"), backgroundColor: Colors.indigo),
+      appBar: AppBar(
+        title: const Text("تست کامل پخش‌کننده"),
+        backgroundColor: Colors.indigo,
+      ),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           children: [
             const Icon(Icons.music_video, size: 100, color: Colors.indigo),
             const SizedBox(height: 20),
-            Text(_status, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(
+              _status,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 10),
-            Text(_currentFilePath?.split('/').last ?? "در حال آماده‌سازی...", 
-              style: const TextStyle(fontSize: 12, color: Colors.grey)),
-            
+            Text(
+              _currentFilePath?.split('/').last ?? "در حال آماده‌سازی...",
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+
             const SizedBox(height: 40),
-            
+
             // Progress Slider
             Slider(
-              value: _position.inMilliseconds.toDouble().clamp(0, _duration.inMilliseconds.toDouble()),
-              max: _duration.inMilliseconds > 0 ? _duration.inMilliseconds.toDouble() : 1.0,
-              onChanged: (v) {}, // Seek not implemented
+              value: _position.inMilliseconds.toDouble().clamp(
+                0,
+                _duration.inMilliseconds.toDouble(),
+              ),
+              max: _duration.inMilliseconds > 0
+                  ? _duration.inMilliseconds.toDouble()
+                  : 1.0,
+              onChanged: (v) {
+                // Preview the thumb position while dragging.
+                setState(() => _position = Duration(milliseconds: v.toInt()));
+              },
+              onChangeEnd: (v) {
+                _audioPlugin.seekTo(v.toInt());
+              },
               activeColor: Colors.indigo,
             ),
             Row(
@@ -152,9 +186,9 @@ class _FullPlayerSampleState extends State<FullPlayerSample> {
                 Text(_formatDuration(_duration)),
               ],
             ),
-            
+
             const SizedBox(height: 30),
-            
+
             // Controls
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -166,7 +200,9 @@ class _FullPlayerSampleState extends State<FullPlayerSample> {
                 ),
                 _buildActionButton(
                   icon: _isPlaying ? Icons.pause : Icons.play_arrow,
-                  onPressed: _isPlaying ? _handlePause : (_isPaused ? _handleResume : _handlePlay),
+                  onPressed: _isPlaying
+                      ? _handlePause
+                      : (_isPaused ? _handleResume : _handlePlay),
                   color: Colors.indigo,
                   size: 70,
                 ),
@@ -177,9 +213,9 @@ class _FullPlayerSampleState extends State<FullPlayerSample> {
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 40),
-            
+
             // Volume
             Row(
               children: [
@@ -203,7 +239,12 @@ class _FullPlayerSampleState extends State<FullPlayerSample> {
     );
   }
 
-  Widget _buildActionButton({required IconData icon, required VoidCallback onPressed, required Color color, double size = 50}) {
+  Widget _buildActionButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+    required Color color,
+    double size = 50,
+  }) {
     return IconButton(
       icon: Icon(icon, size: size * 0.6),
       onPressed: onPressed,

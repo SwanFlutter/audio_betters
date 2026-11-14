@@ -1,6 +1,6 @@
-# audio_betters_example
+# example
 
-Demonstrates how to use the audio_betters plugin.
+A new Flutter project.
 
 ## Getting Started
 

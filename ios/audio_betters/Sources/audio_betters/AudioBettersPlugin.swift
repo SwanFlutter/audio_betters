@@ -5,6 +5,7 @@ import AVFoundation
 public class AudioBettersPlugin: NSObject, FlutterPlugin {
   private var player: AVPlayer?
   private var recorder: AVAudioRecorder?
+  private var recordingPath: String?
 
   public static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(name: "audio_betters", binaryMessenger: registrar.messenger())
@@ -64,6 +65,27 @@ public class AudioBettersPlugin: NSObject, FlutterPlugin {
       startRecorder(path: path, format: format, maxDuration: maxDuration, result: result)
     case "stopRecorder":
       stopRecorder(result: result)
+    case "getRecorderAmplitude":
+      guard let rec = recorder, rec.isRecording else {
+        result(-1.0)
+        return
+      }
+      // averagePower is dBFS (-160...0); map the -50 dBFS floor -> 0.0 and
+      // full scale -> 1.0 so thresholds behave like on every other platform.
+      // Apple requires updateMeters() before the power readings refresh.
+      rec.updateMeters()
+      let db = rec.averagePower
+      let level = max(0.0, min(1.0, (db + 50.0) / 50.0))
+      result(Double(level))
+    case "seekTo":
+      guard let args = call.arguments as? [String: Any],
+            let position = args["position"] as? Int else {
+        result(FlutterError(code: "ARGUMENT_ERROR", message: "Invalid position", details: nil))
+        return
+      }
+      let time = CMTime(seconds: Double(position) / 1000.0, preferredTimescale: 600)
+      player?.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
+      result(nil)
     case "getDuration":
       if let item = player?.currentItem {
           let duration = CMTimeGetSeconds(item.asset.duration)
@@ -107,6 +129,7 @@ public class AudioBettersPlugin: NSObject, FlutterPlugin {
       try session.setActive(true)
 
       recorder = try AVAudioRecorder(url: url, settings: settings)
+      recorder?.meteringEnabled = true
       recorder?.prepareToRecord()
 
       if let duration = maxDuration, duration > 0 {
@@ -114,16 +137,21 @@ public class AudioBettersPlugin: NSObject, FlutterPlugin {
       } else {
           recorder?.record()
       }
+      recordingPath = path
       result(nil)
     } catch {
+      recorder = nil
+      recordingPath = nil
       result(FlutterError(code: "RECORDER_ERROR", message: error.localizedDescription, details: nil))
     }
   }
 
   private func stopRecorder(result: @escaping FlutterResult) {
+    let path = recordingPath
+    recordingPath = nil
     recorder?.stop()
     recorder = nil
-    result(nil)
+    result(path)
   }
 
   private func play(url: URL, result: @escaping FlutterResult) {

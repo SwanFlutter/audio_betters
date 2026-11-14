@@ -1,17 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+
 import 'android_sample.dart';
 import 'ios_macos_sample.dart';
 import 'windows_sample.dart';
 import 'linux_sample.dart';
 import 'web_sample.dart';
 import 'recorder_sample.dart';
+import 'full_player_sample.dart';
+import 'voice_conversation_sample.dart';
 
 void main() {
-  runApp(const MaterialApp(
-    debugShowCheckedModeBanner: false,
-    home: AudioBettersHome(),
-  ));
+  runApp(
+    const MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: AudioBettersHome(),
+    ),
+  );
 }
 
 class AudioBettersHome extends StatelessWidget {
@@ -40,7 +45,8 @@ class AudioBettersHome extends StatelessWidget {
             icon: Icons.android,
             color: Colors.green,
             page: const AndroidAudioSample(),
-            isCurrent: !kIsWeb && defaultTargetPlatform == TargetPlatform.android,
+            isCurrent:
+                !kIsWeb && defaultTargetPlatform == TargetPlatform.android,
           ),
           _buildPlatformTile(
             context,
@@ -48,7 +54,10 @@ class AudioBettersHome extends StatelessWidget {
             icon: Icons.apple,
             color: Colors.black87,
             page: const IosMacosAudioSample(),
-            isCurrent: !kIsWeb && (defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.macOS),
+            isCurrent:
+                !kIsWeb &&
+                (defaultTargetPlatform == TargetPlatform.iOS ||
+                    defaultTargetPlatform == TargetPlatform.macOS),
           ),
           _buildPlatformTile(
             context,
@@ -56,7 +65,8 @@ class AudioBettersHome extends StatelessWidget {
             icon: Icons.window,
             color: Colors.blue,
             page: const WindowsAudioSample(),
-            isCurrent: !kIsWeb && defaultTargetPlatform == TargetPlatform.windows,
+            isCurrent:
+                !kIsWeb && defaultTargetPlatform == TargetPlatform.windows,
           ),
           _buildPlatformTile(
             context,
@@ -77,10 +87,26 @@ class AudioBettersHome extends StatelessWidget {
           const Divider(height: 40),
           _buildPlatformTile(
             context,
+            title: "Voice Conversation Mode (ChatGPT-style)",
+            icon: Icons.graphic_eq,
+            color: Colors.teal,
+            page: const VoiceConversationSample(),
+            isCurrent: false,
+          ),
+          _buildPlatformTile(
+            context,
             title: "Audio Recorder (Multi-Platform)",
             icon: Icons.mic,
             color: Colors.deepPurple,
             page: const AudioRecorderSample(),
+            isCurrent: false,
+          ),
+          _buildPlatformTile(
+            context,
+            title: "Full Player Test (Asset + Controls)",
+            icon: Icons.play_circle_filled,
+            color: Colors.indigo,
+            page: const FullPlayerSample(),
             isCurrent: false,
           ),
         ],
@@ -88,12 +114,14 @@ class AudioBettersHome extends StatelessWidget {
     );
   }
 
-  Widget _buildPlatformTile(BuildContext context,
-      {required String title,
-      required IconData icon,
-      required Color color,
-      required Widget page,
-      required bool isCurrent}) {
+  Widget _buildPlatformTile(
+    BuildContext context, {
+    required String title,
+    required IconData icon,
+    required Color color,
+    required Widget page,
+    required bool isCurrent,
+  }) {
     return Card(
       elevation: isCurrent ? 8 : 2,
       margin: const EdgeInsets.only(bottom: 12),
@@ -104,9 +132,12 @@ class AudioBettersHome extends StatelessWidget {
       child: ListTile(
         leading: Icon(icon, color: color, size: 32),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: isCurrent ? const Text("پلتفرم شناسایی شده") : const Text("نمونه کد مرجع"),
+        subtitle: isCurrent
+            ? const Text("پلتفرم شناسایی شده")
+            : const Text("نمونه کد مرجع"),
         trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => page)),
+        onTap: () =>
+            Navigator.push(context, MaterialPageRoute(builder: (_) => page)),
       ),
     );
   }

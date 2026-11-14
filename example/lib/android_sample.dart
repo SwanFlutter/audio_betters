@@ -10,7 +10,8 @@ class AndroidAudioSample extends StatefulWidget {
 
 class _AndroidAudioSampleState extends State<AndroidAudioSample> {
   final _audioPlugin = AudioBetters();
-  final String _url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3";
+  final String _url =
+      "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3";
   bool _isPlaying = false;
 
   @override
@@ -36,7 +37,10 @@ class _AndroidAudioSampleState extends State<AndroidAudioSample> {
               backgroundColor: _isPlaying ? Colors.green : Colors.grey,
               child: IconButton(
                 iconSize: 40,
-                icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white),
+                icon: Icon(
+                  _isPlaying ? Icons.pause : Icons.play_arrow,
+                  color: Colors.white,
+                ),
                 onPressed: () async {
                   if (_isPlaying) {
                     await _audioPlugin.pause();
@@ -50,7 +54,10 @@ class _AndroidAudioSampleState extends State<AndroidAudioSample> {
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () => _audioPlugin.stop(),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
               child: const Text("Stop & Release Resources"),
             ),
             const Spacer(),

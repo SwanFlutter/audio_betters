@@ -10,7 +10,7 @@ class WindowsAudioSample extends StatefulWidget {
 
 class _WindowsAudioSampleState extends State<WindowsAudioSample> {
   final _audioPlugin = AudioBetters();
-  final String _localFilePath = "C:/Windows/Media/notify.wav"; 
+  final String _localFilePath = "C:/Windows/Media/notify.wav";
   double _volume = 0.5;
   bool _isPlaying = false;
 
@@ -20,24 +20,46 @@ class _WindowsAudioSampleState extends State<WindowsAudioSample> {
     _audioPlugin.setVolume(_volume);
   }
 
+  void _showError(String where, Object e) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text("خطا در $where: $e")));
+  }
+
   void _handlePlay() async {
-    await _audioPlugin.play(_localFilePath);
-    setState(() => _isPlaying = true);
+    try {
+      await _audioPlugin.play(_localFilePath);
+      setState(() => _isPlaying = true);
+    } catch (e) {
+      _showError("پخش", e);
+    }
   }
 
   void _handlePause() async {
-    await _audioPlugin.pause();
-    setState(() => _isPlaying = false);
+    try {
+      await _audioPlugin.pause();
+      setState(() => _isPlaying = false);
+    } catch (e) {
+      _showError("توقف", e);
+    }
   }
 
   void _handleResume() async {
-    await _audioPlugin.resume();
-    setState(() => _isPlaying = true);
+    try {
+      await _audioPlugin.resume();
+      setState(() => _isPlaying = true);
+    } catch (e) {
+      _showError("ادامه", e);
+    }
   }
 
   void _handleStop() async {
-    await _audioPlugin.stop();
-    setState(() => _isPlaying = false);
+    try {
+      await _audioPlugin.stop();
+      setState(() => _isPlaying = false);
+    } catch (e) {
+      _showError("متوقف‌سازی", e);
+    }
   }
 
   @override
@@ -86,7 +108,9 @@ class _WindowsAudioSampleState extends State<WindowsAudioSample> {
             Padding(
               padding: const EdgeInsets.all(20.0),
               child: Card(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
                 elevation: 4,
                 child: Padding(
                   padding: const EdgeInsets.all(20.0),
@@ -113,11 +137,14 @@ class _WindowsAudioSampleState extends State<WindowsAudioSample> {
                         ),
                         child: Text(
                           _localFilePath,
-                          style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 30),
-                      
+
                       // Player Controls
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -139,9 +166,9 @@ class _WindowsAudioSampleState extends State<WindowsAudioSample> {
                           ),
                         ],
                       ),
-                      
+
                       const SizedBox(height: 40),
-                      
+
                       // Volume Slider
                       Row(
                         children: [
@@ -173,7 +200,7 @@ class _WindowsAudioSampleState extends State<WindowsAudioSample> {
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey, fontSize: 13),
               ),
-            )
+            ),
           ],
         ),
       ),
@@ -189,7 +216,7 @@ class _WindowsAudioSampleState extends State<WindowsAudioSample> {
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: Colors.blue.withOpacity(0.4),
+            color: Colors.blue.withValues(alpha: 0.4),
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),
@@ -222,7 +249,7 @@ class _WindowsAudioSampleState extends State<WindowsAudioSample> {
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              border: Border.all(color: color.withOpacity(0.3)),
+              border: Border.all(color: color.withValues(alpha: 0.3)),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: color, size: 28),
